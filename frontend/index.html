@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoadResilience AI — Geospatial Road Connectivity & Resilience Platform</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="RoadResilience AI is a map-first geospatial road intelligence platform that detects and investigates suspected road gaps, missing links, and network disconnects using satellite imagery, OSM road networks, and explainable AI reasoning." />
+  <meta name="keywords" content="RoadResilience AI, Map-First GIS, Leaflet, Road Gap Detection, OSRM Routing, OpenStreetMap, Satellite Evidence, Resilience Intelligence" />
+  <meta name="theme-color" content="#060913" />
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet.js CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="dark-theme">
+  <!-- Topographic Subtle Grid Layer -->
+  <div class="geo-grid-layer" aria-hidden="true"></div>
+
+  <!-- App Layout Wrapper -->
+  <div class="app-layout">
+    
+    <!-- ========================================================================= -->
+    <!-- TOP HEADER BAR -->
+    <!-- ========================================================================= -->
+    <header class="app-header" id="app-header">
+      <!-- Left: Logo & Subtitle -->
+      <div class="header-left">
+        <div class="brand-badge">
+          <svg class="brand-icon-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="url(#brand-grad)" />
+            <circle cx="20" cy="20" r="16" stroke="#0ea5e9" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.5"/>
+            <circle cx="20" cy="20" r="10" stroke="#38bdf8" stroke-width="1.5" opacity="0.8"/>
+            <path d="M8 32 L15 20 L15 8" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M32 32 L25 20 L25 8" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 20 L25 20" stroke="#ec4899" stroke-width="2.6" stroke-dasharray="2 3" stroke-linecap="round"/>
+            <circle cx="20" cy="20" r="3.5" fill="#38bdf8"/>
+            <defs>
+              <linearGradient id="brand-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#091428"/>
+                <stop offset="1" stop-color="#064e3b"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="brand-title-wrap">
+            <span class="brand-title">ROADRESILIENCE <span class="brand-accent">AI</span></span>
+            <span class="status-badge" id="system-status-indicator" title="FastAPI Backend Status">
+              <span class="status-pulse-dot"></span>
+              <span class="status-text" id="system-status-text">Backend Connected</span>
+            </span>
+          </div>
+          <p class="brand-subtitle">AI-Powered Road Connectivity & Resilience Intelligence</p>
+        </div>
+      </div>
+
+      <!-- Center: Global Nominatim Search Bar -->
+      <div class="header-search-container">
+        <div class="search-input-wrapper">
+          <i data-lucide="search" class="search-icon"></i>
+          <input 
+            type="text" 
+            id="location-search-input" 
+            placeholder="Search location (e.g., Hyderabad, Mumbai, Delhi, Charminar, Gachibowli)..." 
+            autocomplete="off"
+            aria-label="Location search"
+          />
+          <button class="search-clear-btn" id="btn-clear-search" title="Clear search" style="display: none;">
+            <i data-lucide="x"></i>
+          </button>
+          <button class="search-submit-btn" id="btn-submit-search" title="Find on Map">
+            <span>Find</span>
+            <i data-lucide="arrow-right"></i>
+          </button>
+        </div>
+        <!-- Live Autocomplete Suggestions -->
+        <div class="search-suggestions-dropdown" id="search-suggestions-dropdown" style="display: none;"></div>
+      </div>
+
+      <!-- Right: Presets, My Location, Demo Toggle, Export -->
+      <div class="header-actions">
+        <!-- Preset Dropdown -->
+        <div class="header-control-group">
+          <select id="preset-select" class="header-select" title="Load Evaluation Location Presets">
+            <option value="" disabled selected>-- Evaluation Presets --</option>
+            <option value="hyderabad_orr">Hyderabad (Outer Ring Road Gap)</option>
+            <option value="delhi_gap">Delhi (Kartavya Path Corridor)</option>
+            <option value="mountain_gap">Himalayas (Rohtang Pass Disconnect)</option>
+            <option value="bridge_gap">Yamuna River (Bridge Waterway Gap)</option>
+            <option value="rural_gap">Rajasthan (Rural Unpaved Track Link)</option>
+          </select>
+        </div>
+
+        <!-- GPS My Location -->
+        <button class="hud-btn hud-btn-secondary" id="btn-gps-location" title="Locate My Position">
+          <i data-lucide="crosshair"></i>
+          <span class="btn-label-desktop">My Location</span>
+        </button>
+
+        <!-- Demo Mode Switch -->
+        <div class="demo-toggle-wrapper" title="Toggle between Live FastAPI Backend and Demo Simulation">
+          <label class="switch-label">
+            <span class="demo-label-text">Demo Mode</span>
+            <input type="checkbox" id="mock-mode-toggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <!-- Export Button -->
+        <button class="hud-btn hud-btn-outline" id="btn-export-data" title="Export Analysis & Report">
+          <i data-lucide="download"></i>
+          <span class="btn-label-desktop">Export</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Demo Mode Active Warning Banner -->
+    <div class="demo-mode-banner" id="demo-mode-banner" style="display: none;">
+      <i data-lucide="alert-triangle"></i>
+      <span><strong>DEMO MODE ACTIVE:</strong> Generating simulated geospatial evaluation data for hackathon demonstrations. Turn OFF to query live FastAPI backend at http://127.0.0.1:8000.</span>
+    </div>
+
+    <!-- Live System Diagnostic Alert Toast -->
+    <div class="system-alert-banner" id="system-alert-banner" style="display: none;">
+      <div class="alert-content">
+        <i data-lucide="alert-circle" class="alert-icon"></i>
+        <div class="alert-text-group">
+          <h4 id="alert-banner-title">System Notice</h4>
+          <p id="alert-banner-message">Message content</p>
+        </div>
+      </div>
+      <button class="alert-close-btn" id="btn-close-alert"><i data-lucide="x"></i></button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MAIN WORKSPACE: NARROW SIDEBAR (15-25%) + LARGE MAP (75-85%) -->
+    <!-- ========================================================================= -->
+    <main class="main-workspace">
+      
+      <!-- ===================================================================== -->
+      <!-- 1. STREAMLINED NARROW COLLAPSIBLE SIDEBAR -->
+      <!-- ===================================================================== -->
+      <aside class="sidebar-compact" id="sidebar-compact">
+        <!-- Sidebar Collapse / Expand Toggle Button -->
+        <button class="sidebar-toggle-btn" id="btn-toggle-sidebar" title="Collapse/Expand Controls">
+          <i data-lucide="chevron-left" id="sidebar-toggle-icon"></i>
+        </button>
+
+        <div class="sidebar-inner-content">
+          <!-- Section 1: Selected Investigation Point -->
+          <div class="sidebar-card">
+            <div class="card-title-row">
+              <div class="title-with-icon">
+                <i data-lucide="map-pin" class="accent-icon"></i>
+                <h3 class="card-heading">Target Focal Area</h3>
+              </div>
+              <button class="btn-micro" id="btn-copy-coordinates" title="Copy Coordinates">
+                <i data-lucide="copy"></i>
+                <span>Copy</span>
+              </button>
+            </div>
+
+            <div class="location-name-banner" id="sidebar-location-name">
+              <i data-lucide="compass"></i>
+              <span id="location-name-text">Hyderabad, Telangana, India</span>
+            </div>
+
+            <div class="coord-compact-grid">
+              <div class="coord-pill">
+                <span class="pill-lbl">LAT</span>
+                <span class="pill-val" id="sidebar-lat">17.385044</span>
+              </div>
+              <div class="coord-pill">
+                <span class="pill-lbl">LON</span>
+                <span class="pill-val" id="sidebar-lon">78.486671</span>
+              </div>
+            </div>
+
+            <!-- Search Radius Slider -->
+            <div class="radius-control-box">
+              <div class="radius-header">
+                <label for="radius-slider">Search Radius</label>
+                <span class="radius-val-badge" id="radius-value-display">500 m</span>
+              </div>
+              <input 
+                type="range" 
+                id="radius-slider" 
+                min="50" 
+                max="5000" 
+                step="50" 
+                value="500" 
+                aria-label="Search Radius Slider"
+              />
+              <div class="radius-chips-row">
+                <button class="preset-chip" data-radius="200">200m</button>
+                <button class="preset-chip active" data-radius="500">500m</button>
+                <button class="preset-chip" data-radius="1000">1km</button>
+                <button class="preset-chip" data-radius="2000">2km</button>
+                <button class="preset-chip" data-radius="5000">5km</button>
+              </div>
+            </div>
+
+            <!-- Primary Action CTA: Investigate -->
+            <button class="btn-primary-investigate" id="btn-run-investigate">
+              <i data-lucide="sparkles"></i>
+              <span>INVESTIGATE ROAD GAP</span>
+            </button>
+          </div>
+
+          <!-- Section 2: Route Mode Toggle Button -->
+          <div class="sidebar-card">
+            <div class="card-title-row">
+              <div class="title-with-icon">
+                <i data-lucide="navigation-2" class="accent-icon"></i>
+                <h3 class="card-heading">Routing & Shortcuts</h3>
+              </div>
+            </div>
+            <p class="card-desc-sm">Click start and destination directly on the map to evaluate road gap shortcuts.</p>
+            
+            <button class="btn-route-mode" id="btn-toggle-route-mode">
+              <i data-lucide="route"></i>
+              <span id="route-mode-btn-text">🧭 ACTIVATE ROUTE MODE</span>
+            </button>
+          </div>
+
+          <!-- Section 3: AI Verdict Concise Summary Card -->
+          <div class="sidebar-card" id="sidebar-verdict-card">
+            <div class="card-title-row">
+              <span class="card-tag">AI SUMMARY</span>
+              <span class="timestamp-micro" id="verdict-timestamp">Ready</span>
+            </div>
+
+            <div class="verdict-summary-badge verdict-likely" id="sidebar-verdict-badge">
+              <i data-lucide="check-circle-2" id="sidebar-verdict-icon"></i>
+              <div class="verdict-text-group">
+                <span class="verdict-label">ASSESSMENT</span>
+                <strong id="sidebar-verdict-title">LIKELY_EXISTS</strong>
+              </div>
+              <div class="confidence-pill" id="sidebar-confidence-pill">95%</div>
+            </div>
+
+            <!-- Quick Evidence Checkmarks -->
+            <div class="evidence-quick-checklist">
+              <div class="check-item"><span class="check-dot positive">✓</span> Satellite Imagery</div>
+              <div class="check-item"><span class="check-dot positive">✓</span> Road Network Topology</div>
+              <div class="check-item"><span class="check-dot positive">✓</span> Low Environmental Barrier</div>
+            </div>
+
+            <div class="sidebar-actions-row">
+              <button class="btn-outline-sm" id="btn-open-evidence-modal">
+                <i data-lucide="binary"></i>
+                <span>View Evidence</span>
+              </button>
+              <button class="btn-outline-sm" id="btn-open-disaster-modal">
+                <i data-lucide="flame"></i>
+                <span>Emergency Sim</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 4: Human Review Status -->
+          <div class="sidebar-card">
+            <div class="card-title-row">
+              <span class="card-heading-sm">Surveyor Verification</span>
+              <span class="badge-status-review" id="review-status-badge">Pending</span>
+            </div>
+            <div class="verification-buttons-grid">
+              <button class="btn-verify btn-verify-confirm" id="btn-verify-confirm" title="Confirm Road Exists">
+                <i data-lucide="check"></i> Confirm
+              </button>
+              <button class="btn-verify btn-verify-reject" id="btn-verify-reject" title="Reject AI Result">
+                <i data-lucide="x"></i> Reject
+              </button>
+              <button class="btn-verify btn-verify-flag" id="btn-verify-flag" title="Flag for Field Check">
+                <i data-lucide="alert-triangle"></i> Field Check
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- ===================================================================== -->
+      <!-- 2. PRIMARY MAP CANVAS (75-85% VIEWPORT) -->
+      <!-- ===================================================================== -->
+      <section class="map-primary-section" aria-label="Geospatial Road Intelligence Map">
+        <!-- Leaflet Map Canvas -->
+        <div id="leaflet-map" class="map-canvas"></div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: TOP-LEFT COORDINATE & LOCATION HUD -->
+        <!-- =================================================================== -->
+        <div class="map-floating-hud-topleft" id="map-coords-hud">
+          <div class="hud-focal-icon">📍</div>
+          <div class="hud-focal-info">
+            <span class="hud-location-name" id="hud-location-name">Hyderabad, Telangana</span>
+            <div class="hud-meta-row">
+              <span class="hud-coord-text" id="hud-latlon">17.385044, 78.486671</span>
+              <span class="hud-meta-divider">•</span>
+              <span class="hud-radius-text" id="hud-radius">Radius: 500 m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: TOP-CENTER 2-CLICK ROUTE MODE BANNER -->
+        <!-- =================================================================== -->
+        <div class="route-mode-floating-banner" id="route-mode-banner" style="display: none;">
+          <div class="route-banner-step" id="route-step-indicator">
+            <span class="step-badge" id="route-step-badge">1</span>
+            <div class="step-text-wrap">
+              <strong id="route-step-title">Click anywhere on the map to set START (Origin)</strong>
+              <span class="step-subtext" id="route-step-subtext">Step 1 of 2: Origin Selection</span>
+            </div>
+          </div>
+          <div class="route-banner-actions">
+            <button class="btn-banner-action" id="btn-clear-active-route" title="Clear Route Points">
+              <i data-lucide="rotate-ccw"></i> Clear
+            </button>
+            <button class="btn-banner-action btn-banner-close" id="btn-exit-route-mode" title="Exit Route Mode">
+              <i data-lucide="x"></i> Exit
+            </button>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: TOP-RIGHT FLOATING CONTROLS & BASEMAP SWITCHER -->
+        <!-- =================================================================== -->
+        <div class="map-floating-controls-topright">
+          <!-- Basemap & Layer Control Popup Toggle -->
+          <div class="layer-control-wrapper">
+            <button class="map-hud-btn" id="btn-toggle-layers" title="Map Layers & Overlays">
+              <i data-lucide="layers"></i>
+              <span>Layers</span>
+            </button>
+            <div class="layer-dropdown-card" id="layer-selector-popup" style="display: none;">
+              <div class="layer-group-title">BASEMAP TILES</div>
+              <label class="layer-radio-item">
+                <input type="radio" name="basemap" value="dark" checked />
+                <span>Dark Matter GIS (Default)</span>
+              </label>
+              <label class="layer-radio-item">
+                <input type="radio" name="basemap" value="satellite" />
+                <span>Satellite (Esri World Imagery)</span>
+              </label>
+              <label class="layer-radio-item">
+                <input type="radio" name="basemap" value="osm" />
+                <span>OpenStreetMap Standard</span>
+              </label>
+              <label class="layer-radio-item">
+                <input type="radio" name="basemap" value="topo" />
+                <span>OpenTopoMap Terrain</span>
+              </label>
+
+              <div class="layer-divider"></div>
+              <div class="layer-group-title">MAP OVERLAYS</div>
+              <label class="layer-checkbox-item">
+                <input type="checkbox" id="toggle-layer-roads" checked />
+                <span>Existing Road Network</span>
+              </label>
+              <label class="layer-checkbox-item">
+                <input type="checkbox" id="toggle-layer-gap" checked />
+                <span>Road Gap & AI Candidate</span>
+              </label>
+              <label class="layer-checkbox-item">
+                <input type="checkbox" id="toggle-layer-pois" checked />
+                <span>Nearby Facilities (POIs)</span>
+              </label>
+              <label class="layer-checkbox-item">
+                <input type="checkbox" id="toggle-layer-routes" checked />
+                <span>Active Driving Routes</span>
+              </label>
+              <label class="layer-checkbox-item">
+                <input type="checkbox" id="toggle-layer-radius" checked />
+                <span>Search Radius Circle</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Reset View Button -->
+          <button class="map-hud-btn" id="btn-reset-map-view" title="Recenter on Target Location">
+            <i data-lucide="maximize-2"></i>
+          </button>
+
+          <!-- Fullscreen Button -->
+          <button class="map-hud-btn" id="btn-fullscreen-map" title="Toggle Fullscreen Map">
+            <i data-lucide="expand"></i>
+          </button>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: COMPACT POI CATEGORY FILTER BAR (TOP-CENTER) -->
+        <!-- =================================================================== -->
+        <div class="map-poi-filter-bar" id="map-poi-filter-bar">
+          <button class="poi-filter-chip active" data-category="all">All Features</button>
+          <button class="poi-filter-chip" data-category="hospital">🏥 Hospitals</button>
+          <button class="poi-filter-chip" data-category="school">🏫 Schools</button>
+          <button class="poi-filter-chip" data-category="fuel">⛽ Fuel</button>
+          <button class="poi-filter-chip" data-category="transit">🚆 Transit</button>
+          <button class="poi-filter-chip" data-category="emergency">👮 Emergency</button>
+          <button class="poi-filter-chip" data-category="shop">🏪 Markets</button>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: BOTTOM 3-WAY ROUTE COMPARISON CARD -->
+        <!-- =================================================================== -->
+        <div class="map-route-comparison-card" id="map-route-comparison-card" style="display: none;">
+          <div class="route-card-header">
+            <div class="route-header-title">
+              <i data-lucide="git-compare" class="accent-icon"></i>
+              <span>Multi-Route Resilience & Shortcut Evaluation</span>
+            </div>
+            <button class="card-minimize-btn" id="btn-close-route-card"><i data-lucide="x"></i></button>
+          </div>
+
+          <div class="route-comparison-grid">
+            <!-- 1. Current Baseline Route -->
+            <div class="route-box box-current">
+              <div class="route-box-title">
+                <span class="route-bullet bullet-current"></span>
+                <span>Current Route (Existing Roads)</span>
+              </div>
+              <div class="route-box-stats">
+                <span class="stat-distance" id="card-route-cur-dist">18.4 km</span>
+                <span class="stat-duration" id="card-route-cur-time">32 min</span>
+              </div>
+              <span class="route-box-note">Follows mapped detour</span>
+            </div>
+
+            <!-- 2. Alternative Route -->
+            <div class="route-box box-alt">
+              <div class="route-box-title">
+                <span class="route-bullet bullet-alt"></span>
+                <span>Alternative Route (Detour)</span>
+              </div>
+              <div class="route-box-stats">
+                <span class="stat-distance" id="card-route-alt-dist">14.1 km</span>
+                <span class="stat-duration" id="card-route-alt-time">25 min</span>
+              </div>
+              <span class="route-box-note">Congested bypass</span>
+            </div>
+
+            <!-- 3. AI Candidate Resilient Shortcut -->
+            <div class="route-box box-ai-candidate">
+              <div class="route-box-title">
+                <span class="route-bullet bullet-ai"></span>
+                <span>AI Candidate Connection</span>
+                <span class="ai-badge-chip">AI Candidate</span>
+              </div>
+              <div class="route-box-stats">
+                <span class="stat-distance text-accent-emerald" id="card-route-ai-dist">8.2 km</span>
+                <span class="stat-duration text-accent-emerald" id="card-route-ai-time">15 min</span>
+              </div>
+              <span class="route-box-note">Via investigated road gap</span>
+            </div>
+
+            <!-- 4. Savings Box -->
+            <div class="route-box box-savings">
+              <div class="route-box-title text-accent-emerald">
+                <i data-lucide="trending-up"></i>
+                <span>Potential Savings</span>
+              </div>
+              <div class="savings-highlights">
+                <div class="saving-item">
+                  <span class="saving-num text-accent-emerald" id="card-savings-dist">10.2 km</span>
+                  <span class="saving-lbl" id="card-savings-dist-pct">↓ 55% shorter</span>
+                </div>
+                <div class="saving-item">
+                  <span class="saving-num text-accent-emerald" id="card-savings-time">17 min</span>
+                  <span class="saving-lbl" id="card-savings-time-pct">↓ 53% faster</span>
+                </div>
+              </div>
+              <span class="saving-footnote">Calculated from live OSRM geometries</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- FLOATING OVERLAY: BOTTOM-LEFT COMPACT MAP LEGEND -->
+        <!-- =================================================================== -->
+        <div class="map-legend-card" id="map-legend-card">
+          <div class="legend-header" id="legend-toggle-btn">
+            <div class="legend-title">
+              <i data-lucide="info"></i>
+              <span>Map Legend</span>
+            </div>
+            <i data-lucide="chevron-down" class="legend-chevron" id="legend-chevron"></i>
+          </div>
+          <div class="legend-body" id="legend-body">
+            <div class="legend-item">
+              <span class="legend-line line-existing"></span>
+              <span class="legend-text">🟢 Existing Mapped Road</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot dot-gap"></span>
+              <span class="legend-text">🟠 Suspected Road Gap / Break</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line line-ai-candidate"></span>
+              <span class="legend-text">🟣 AI Resilient Candidate Connection</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-pin pin-start">A</span>
+              <span class="legend-text">🔵 Start (Origin Point)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-pin pin-dest">B</span>
+              <span class="legend-text">🔴 Destination (Target Point)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line line-alternative"></span>
+              <span class="legend-text">🟡 Alternative Detour Route</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot dot-facility"></span>
+              <span class="legend-text">🏥 Critical POI / Facility</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Interaction Prompt Badge (Bottom-Right) -->
+        <div class="map-click-hint-badge">
+          <i data-lucide="mouse-pointer-click"></i>
+          <span>Click map to reposition investigation target</span>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL / SLIDE-OVER: EXPLAINABLE AI EVIDENCE & AUDIT TRAIL -->
+    <!-- ========================================================================= -->
+    <div class="modal-backdrop" id="evidence-modal" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <i data-lucide="binary" class="accent-icon"></i>
+            <h3>Why did AI decide this? — Evidence Breakdown</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-evidence-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="evidence-modal-cards">
+            <!-- Satellite Evidence -->
+            <div class="evidence-block">
+              <div class="evidence-block-header">
+                <i data-lucide="satellite" class="text-accent-cyan"></i>
+                <h4>Satellite / Spectral Evidence</h4>
+              </div>
+              <ul class="evidence-list" id="modal-satellite-evidence-list">
+                <li>Continuous linear corridor matching road geometry extracted across coordinates.</li>
+                <li>Surface spectral reflectance profile indicates paved/compacted roadway.</li>
+                <li>No permanent natural water barrier or structural cliff dividing endpoints.</li>
+              </ul>
+            </div>
+
+            <!-- Road Network Topology -->
+            <div class="evidence-block">
+              <div class="evidence-block-header">
+                <i data-lucide="git-branch" class="text-accent-purple"></i>
+                <h4>Road Network Topology (OSM)</h4>
+              </div>
+              <ul class="evidence-list" id="modal-network-evidence-list">
+                <li>Two classified road links terminate abruptly near the focal area.</li>
+                <li>Topological continuity analysis indicates missing edge in base vector map.</li>
+                <li>Connecting endpoints restores arterial loop redundancy.</li>
+              </ul>
+            </div>
+
+            <!-- Environmental Context -->
+            <div class="evidence-block">
+              <div class="evidence-block-header">
+                <i data-lucide="trees" class="text-accent-emerald"></i>
+                <h4>Geographic & Environmental Context</h4>
+              </div>
+              <ul class="evidence-list" id="modal-geo-evidence-list">
+                <li>Vegetation density: Moderate tree canopy (may obscure overhead optical view).</li>
+                <li>Terrain slope: Motorable gradient (&lt; 5.5%).</li>
+                <li>Flood vulnerability: Low elevation risk index.</li>
+              </ul>
+            </div>
+
+            <!-- Agent Execution Trace -->
+            <div class="evidence-block">
+              <div class="evidence-block-header">
+                <i data-lucide="cpu" class="text-accent-amber"></i>
+                <h4>AI Agent Step-by-Step Execution Trace</h4>
+              </div>
+              <ol class="agent-trace-list" id="modal-agent-trace-list">
+                <li>Queried OpenStreetMap topological graph within selected radius</li>
+                <li>Extracted high-resolution satellite imagery tiles & spectral indices</li>
+                <li>Evaluated terrain slope, elevation, and environmental barriers</li>
+                <li>Synthesized multimodal confidence determination and resilient candidate shortcut</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="hud-btn hud-btn-primary" id="btn-done-evidence-modal">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL: EMERGENCY DISASTER SCENARIO SIMULATOR -->
+    <!-- ========================================================================= -->
+    <div class="modal-backdrop" id="disaster-modal" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <i data-lucide="alert-triangle" class="text-accent-rose"></i>
+            <h3>Emergency Resilience Scenario Simulation</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-disaster-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Simulate arterial road severance during natural disasters to test how the AI Candidate resilient shortcut prevents community isolation.</p>
+          
+          <div class="scenario-selector-group">
+            <label for="disaster-select">Select Hazard Scenario:</label>
+            <select id="disaster-select" class="header-select">
+              <option value="flood">🌊 Flash Flood / Causeway Submersion</option>
+              <option value="landslide">⛰️ Mountain Pass Landslide / Rockfall</option>
+              <option value="bridge_failure">🌉 Bridge Structural Failure</option>
+              <option value="road_closure">🚧 Emergency Artery Closure</option>
+              <option value="wildfire">🔥 Wildfire Evacuation Corridor</option>
+            </select>
+          </div>
+
+          <div class="scenario-simulation-card" id="scenario-outcome-box">
+            <h4>Simulation Impact</h4>
+            <p id="scenario-desc-text">Primary highway artery is severed by the hazard zone. The AI Resilient Candidate Connection provides the critical alternate lifeline to emergency healthcare.</p>
+            <div class="scenario-stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-lbl">Primary Route Status</span>
+                <span class="stat-card-val text-accent-rose" id="scenario-route-status">BLOCKED</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-lbl">Resilient Bypass</span>
+                <span class="stat-card-val text-accent-emerald" id="scenario-bypass-status">ACTIVE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="hud-btn hud-btn-outline" id="btn-reset-scenario">Reset</button>
+          <button class="hud-btn hud-btn-primary" id="btn-apply-scenario">Apply Simulation to Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL: EXPORT DATA -->
+    <!-- ========================================================================= -->
+    <div class="modal-backdrop" id="export-modal" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <i data-lucide="download" class="accent-icon"></i>
+            <h3>Export RoadResilience AI Report</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-export-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Export complete multimodal analysis data, evidence records, OSRM routing metrics, and surveyor verification notes.</p>
+          <div class="export-preview-box">
+            <pre><code id="export-json-preview">Loading export payload...</code></pre>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="hud-btn hud-btn-outline" id="btn-copy-json-export">
+            <i data-lucide="clipboard"></i> Copy JSON
+          </button>
+          <button class="hud-btn hud-btn-primary" id="btn-download-json-export">
+            <i data-lucide="download"></i> Download JSON
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Leaflet.js Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Application Controller -->
+  <script src="app.js"></script>
+</body>
+</html>
